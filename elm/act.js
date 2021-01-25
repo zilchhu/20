@@ -9,6 +9,7 @@ export default class Act {
     this.deliverAct = new DeliverAct(shopId)
     this.shopId = shopId
     this.headers = { 'x-shard': `shopid=${this.shopId}` }
+    this.subsidyAct = new SubsidyAct(shopId)
   }
 
   list() {
@@ -235,7 +236,7 @@ class FoodAct {
           conditionType: 'ONLY',
           effectiveCondition: { forPeople: 'ALL_CUSTOM' },
           elePlatform: true,
-          icon: {backgroud: "#FAA43C", text: "换"},
+          icon: { backgroud: '#FAA43C', text: '换' },
           source: 'SELF_MARKETING',
           stockDTO: { stock: 10000, stockType: 'DAILY' },
           tied: true,
@@ -319,5 +320,38 @@ class DeliverAct {
       }
     }
     return instance2.post(urls.act.deliverAct.invalid, data, { headers: this.headers })
+  }
+}
+
+class SubsidyAct {
+  constructor(shopId) {
+    this.shopId = shopId
+    this.headers = { 'x-shard': `shopid=${this.shopId}` }
+  }
+  getGlobalId(playInstanceId) {
+    let params = {
+      sellerId: this.shopId,
+      playInstanceId,
+      skuId: null,
+      operatorId: this.shopId
+    }
+    return instance2.get(urls.act.subsidy.globalId, { headers: this.headers, params })
+  }
+
+  getInfo(playInstanceId) {
+    let data = {
+      operatorId: this.shopId,
+      playInstanceId
+    }
+    return instance2.post(urls.act.subsidy.getInfo, data, { headers: this.headers })
+  }
+
+  modify(applyInfoGlobalId, formFields) {
+    let data = {
+      applyInfoGlobalId,
+      operatorId: this.shopId,
+      formFields
+    }
+    return instance2.post(urls.act.subsidy.modify, data, { headers: this.headers })
   }
 }

@@ -1,6 +1,8 @@
 import axios from 'axios'
 import urls_ from './url.js'
 
+const namespace = 'axios-retry'
+
 const id = 'F87A24ACA93043258B7D4AE0FD4F2246|1609236931131'
 const metas = {
   appName: 'melody',
@@ -34,6 +36,10 @@ const instance = axios.create({
 instance.interceptors.request.use(
   config => {
     if (config.method == 'post') {
+      config[namespace] = config[namespace] || {}
+      config[namespace].data = config.data
+      config[namespace].retryCount = config[namespace].retryCount || 0
+
       config.data = {
         id,
         metas,
@@ -54,7 +60,26 @@ instance.interceptors.response.use(
     }
     return res.data.result == null ? Promise.resolve(res.data) : Promise.resolve(res.data.result)
   },
-  err => Promise.reject(err)
+  error => {
+    const config = error.config
+
+    if (!config || !config[namespace]) {
+      return Promise.reject(error)
+    }
+
+    const shouldRetry = /ETIMEDOUT|ECONNRESET/.test(error.code) && config[namespace].retryCount < 3
+
+    if (shouldRetry) {
+      config[namespace].retryCount += 1
+
+      console.log('retry...', config[namespace].retryCount)
+      return new Promise(resolve =>
+        setTimeout(() => resolve(instance({ ...config, data: config[namespace].data })), 600)
+      )
+    }
+
+    return Promise.reject(error)
+  }
 )
 
 export default instance

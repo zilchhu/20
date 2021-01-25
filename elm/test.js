@@ -2,6 +2,8 @@ import App, { loop, wrap, readXls, readJson } from './app.js'
 import knex from 'knex'
 import flatten from 'flatten'
 import dayjs from 'dayjs'
+import fs from 'fs'
+import sleep from 'sleep-promise'
 
 const knx = knex({
   client: 'mysql',
@@ -12,6 +14,15 @@ const knx = knex({
     database: 'naicai'
   }
 })
+
+// async function t1() {
+//   try {
+//     const data = await readXls('elm/饿了么低质量(1)(1).xlsx', 'c2')
+//     console.log(await knx('test_elm_low_temp_').insert(data))
+//   } catch (error) {
+//     console.error(error)
+//   }
+// }
 
 function omit(obj, ks) {
   let newKs = Object.keys(obj).filter(v => !ks.includes(v))
@@ -35,8 +46,8 @@ async function renameFood(id, oldName, newName) {
 
 async function test_rename() {
   try {
-    let data = await readXls('elm/饿了么品名整理(1).xlsx', '333')
-    data = data.filter(v => v.更新后品名 != '').map(v => [v.shop_id, v.name, v.更新后品名])
+    let data = await readXls('elm/饿了么产品名调整.xlsx', '饿了么产品名')
+    data = data.filter(v => v.修改后产品名 != '').map(v => [v.shop_id, v.name, v.修改后产品名])
     await loop(renameFood, data, false)
   } catch (error) {
     console.error(error)
@@ -73,7 +84,7 @@ async function updateAct(id, name, benefit) {
     let act = acts.find(v => v.name == name)
 
     if (act) {
-      // const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
+      const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
 
       // const actMaxCount = await app.act.foodAct.getCount()
       // if (
@@ -86,7 +97,7 @@ async function updateAct(id, name, benefit) {
       await app.act.foodAct.invalid(act.activityId, act.foodId)
       await app.act.foodAct.updateCount(-1)
 
-      const res = await app.act.foodAct.create(act.foodId, benefit, 10000)
+      const res = await app.act.foodAct.create(act.foodId, benefit, actContent.effectTimes)
       return Promise.resolve(res)
     } else {
       let effectTimes = 10000
@@ -181,14 +192,6 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice) {
       result.purchaseRes = purchaseRes
     }
 
-    if (price) {
-      const priceRes = await app.food.updateFoodSpecs(
-        food.id,
-        food.specs.map(spec => ({ ...spec, packageFee: boxPrice, price }))
-      )
-      result.priceRes = priceRes.specs
-    }
-
     if (boxPrice) {
       const boxRes = await app.food.updatePackageFee(
         food.id,
@@ -197,6 +200,15 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice) {
       )
       result.boxRes = boxRes
     }
+
+    if (price) {
+      const priceRes = await app.food.updateFoodSpecs(
+        food.id,
+        food.specs.map(spec => ({ ...spec, packageFee: boxPrice, price }))
+      )
+      result.priceRes = priceRes.specs
+    }
+
     if (actPrice) {
       const actRes = await updateAct(id, name, actPrice)
       result.actRes = actRes
@@ -219,10 +231,14 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let data = await readXls('elm/雪花球重上.xlsm', '饿了么雪花球重上')
+    let data = await readXls('elm/饿了么折扣.xlsx', '折扣12.8')
     // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [v.门店id, '雪花球【6粒】$', null, null, null, 8.8])
-    // let data = readJson('elm/log/log.json').map(v => v.meta)
+    data = data.map(v => [v.门店id, v.品名, null, null, null, 12.8])
+    // data = data.map(v => [v.门店id, v.品名])
+
+    // let data = readJson('elm/log/log.json')
+    //   .filter(v => v.err.code == 'ETIMEDOUT')
+    //   .map(v => v.meta)
     await loop(updatePlan, data, false)
   } catch (error) {
     console.error(error)
@@ -246,9 +262,19 @@ async function updateSell(id, name, sell) {
   }
 }
 
+async function batchRemove(id, name) {
+  const app = new App(id)
+  try {
+    const food = await app.food.find(name)
+    return app.food.batchRemove([{ foodId: food.id, foodSpecIds: food.specs.map(spec => spec.id) }])
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
 async function test_offsell() {
   try {
-    let data = await readXls('elm/雪花球重上.xlsm', '饿了么雪花球重上')
+    let data = await readXls('elm/饿了么批量修改.xlsx', '批量下架')
     data = data.map(v => [v.门店id, v.品名, false])
     await loop(updateSell, data, false)
   } catch (error) {
@@ -364,6 +390,38 @@ async function updateDeliverActTime(id) {
   }
 }
 
+async function updateSubsidy(shopId) {
+  const app = new App(shopId)
+  try {
+    const act = await app.act.find('百亿补贴')
+
+    const instanceId = new URL(act.url).searchParams.get('playInstanceId')
+    const { globalId } = await app.act.subsidyAct.getGlobalId(instanceId)
+
+    let { rules } = await app.act.subsidyAct.getInfo(instanceId)
+    rules[6].value = JSON.parse(rules[6].value)
+    rules[6].value.rule[0].benefit = 6
+    rules[6].value.rule[1].benefit = 10
+    rules[6].value.rule[2].benefit = 14
+    rules[6].value = JSON.stringify(rules[6].value)
+    let formFields = [rules[0], rules[6]]
+
+    return app.act.subsidyAct.modify(globalId, formFields)
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+async function test_subsidy() {
+  try {
+    let data = await readXls('elm/百亿补贴修改门店.xlsx', 'Sheet1')
+    data = data.map(v => [v.id])
+    await loop(updateSubsidy, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 async function createDeliverAct(id) {
   const app = new App(id)
   try {
@@ -461,6 +519,36 @@ async function updateMaterial(id, name, material) {
   }
 }
 
+async function updateSku(id, name, boxPrice, price) {
+  const app = new App(id)
+  try {
+    const food = await app.food.find(name)
+    const foodView = await app.food.getFoodView(food.id)
+    let specs = [foodView.food.specs[0]]
+    specs[0].name = '1'
+    specs.push({
+      name: '2',
+      price,
+      weight: 0,
+      calorie: null,
+      stock: 10000,
+      maxStock: 10000,
+      packageFee: boxPrice || specs[0].packageFee,
+      stockStatus: 0,
+      onShelf: true
+    })
+    const edited = await app.food.editFood(food.id, { ...foodView.food, specs })
+    await sleep(600)
+    const editedfoodView = await app.food.getFoodView(food.id)
+    let spec = editedfoodView.food.specs.find(v => v.name == '2')
+    if (!spec) return Promise.reject({ err: 'spec not found' })
+    spec.name = ''
+    return app.food.editFood(food.id, { ...editedfoodView.food, specs: [spec] })
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
 async function updateLabel(id, name, label) {
   const app = new App(id)
   try {
@@ -484,33 +572,129 @@ async function updateLabel(id, name, label) {
   }
 }
 
-async function test() {
+async function updateCateModel(id, name, model) {
+  const app = new App(id)
   try {
-    let data = await readXls('elm/饿了么低质量(1)(1).xlsx', 'c2')
-    data = data.filter(v => v.特色 != '')
-    let data2 = await knx('test_elm_low_')
-      .select()
-      .whereIn(
-        'itemName',
-        data.map(v => v.itemName)
-      )
-      .andWhere('lowIndicator', 'like', '%特色%')
-    data2 = data2
-      // .slice(data2.length - 38000)
-      .map(v => ({ ...v, material: data.find(k => k.itemName == v.itemName).特色 }))
-      .map(v => [v.shopId, v.itemName, v.material])
-      .slice(0, 1000)
+    const food = await app.food.find(name)
+    const foodView = await app.food.getFoodView(food.id)
+    const c = await app.food.findCategoryModel(model)
+    const p = foodView.food.properties.map(v => ({
+      ...v,
+      details:
+        v.details.length == 1
+          ? v.details
+              .map(d => ({ ...d, name: d.name.trim() }))
+              .concat([{ ...v.details[0], name: v.details[0].name + '.' }])
+          : v.details.map(d => ({ ...d, name: d.name.trim() }))
+    }))
+    const data = { ...foodView.food, categoryModel: c, properties: p }
+    return app.food.editFood(food.id, data)
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
 
-    // let data = await readJson('elm/log/log.json')
-    // data = data.map(v => v.meta)
-    await loop(updateLabel, data2, false)
+async function test_improve_low() {
+  try {
+    // let data = await readXls('elm/饿了么低质量(1)(1).xlsx', 'c2')
+    // data = data.filter(v => v.特色 != '')
+    // let data2 = await knx('test_elm_low_')
+    //   .select()
+    //   .whereIn(
+    //     'itemName',
+    //     data.map(v => v.itemName)
+    //   )
+    //   .andWhere('lowIndicator', 'like', '%特色%')
+    // data2 = data2
+    //   // .slice(data2.length - 38000)
+    //   .map(v => ({ ...v, label: data.find(k => k.itemName == v.itemName).特色 }))
+    //   .map(v => [v.shopId, v.itemName, v.label])
+
+    let data = await readJson('elm/log/log.json')
+    data = data.map(v => v.meta)
+
+    await loop(updateLabel, data, false)
   } catch (error) {
     console.error(error)
   }
 }
 
-test()
+async function test_logAppeal() {
+  try {
+    let data = await knx('elm_shops_').select().where({ restaurantType: 'LEAF' })
+    data = data.map(v => [v.id])
+    await loop(logAppeal, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
 
+async function logAppeal(id) {
+  try {
+    const app = new App(id)
+    const cats = await app.food.listFoodCat()
+    let data = []
+    for (let cat of cats) {
+      try {
+        let foods = await app.food.listFoods(cat.id)
+        foods = foods
+          .filter(food => food.itemAuditInfoList)
+          .map(food => ({
+            id: food.id,
+            name: food.name,
+            shopId: id,
+            auditStatus: food.itemAuditInfoList[0].auditStatus,
+            detail: food.itemAuditInfoList[0].detail
+          }))
+        data.push(foods)
+      } catch (e) {
+        console.error(e)
+        continue
+      }
+    }
+    return knx('test_elm_appeal_').insert(flatten(data))
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+async function appeal(id, name) {
+  try {
+    const app = new App(id)
+    const food = await app.food.find(name)
+    // APPEAL_FAILED AUDIT_FAILED
+    if (!food.itemAuditInfoList || food.itemAuditInfoList[0].auditStatus == 'APPEALING')
+      return Promise.reject({ err: 'no need' })
+    return app.food.appeal(food.itemAuditInfoList[0])
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+async function test_appeal() {
+  try {
+    let data = await readXls('elm/饿了么改价失败 申述.xlsx', 'Sheet1')
+    data = data.map(v => [v.门店id, v.产品]).slice(data.length - 220)
+    await loop(appeal, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// async function test() {
+//   try {
+//     await wrap(updateSku, [500620917, '西米红豆沙.', 1.1, 20])
+//   } catch (error) {
+//     console.error(error)
+//   }
+// }
+
+// test()
+// test_plan()
+// test_subsidy()
+// test_loglow()
+// test_improve_low()
+// test_logAppeal()
 // 0  1  2  3
 // 4  5  6  7
 // 8  9  10 11

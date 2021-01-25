@@ -6,6 +6,7 @@ const urls = {
     batchRemove: 'nevermore.goods/invoke/?method=FoodService.batchRemoveFoods',
     updateFoodCatSeq: 'nevermore.goods/invoke/?method=FoodService.setGroupPosition',
     listFoodCat: 'nevermore.goods/invoke/?method=FoodService.queryCategoryWithFoodFilter',
+    listFoods: 'nevermore.goods/invoke/?method=FoodService.queryFoodsByCategoryIdWithFoodFilter',
     batchUpdate: 'nevermore.goods/invoke/?method=BatchFoodService.batchUpdateFood',
     bupdatePackageFee: 'nevermore.goods/invoke/?method=FoodService.batchUpdatePackageFee',
     bupdateSell: 'nevermore.goods/invoke/?method=FoodService.batchUpdateSellStatus',
@@ -13,7 +14,8 @@ const urls = {
     editFood: 'nevermore.goods/invoke/?method=FoodService.updateFood',
     forOptimize: 'nevermore.goods/invoke/?method=AssistantService.queryWaitForOptimizeItem',
     categoryModels: 'nevermore.goods/invoke/?method=CategoryService.getCategoryList',
-    getMaterialTree: 'nevermore.goods/invoke/?method=MenuDataService.getMaterialTreeByShopId'
+    getMaterialTree: 'nevermore.goods/invoke/?method=MenuDataService.getMaterialTreeByShopId',
+    appeal: 'nevermore.goods/invoke/?method=IllegalItemService.appealForControl'
   },
   act: {
     foodAct: {
@@ -31,6 +33,11 @@ const urls = {
       invalid: 'activity-tool/invalidActivityByInstanceId',
       create: 'activity-tool/createSelfPlay',
       withdraw: 'zelda/withdraw-napos-apply'
+    },
+    subsidy: {
+      globalId: 'zelda/query-global-id',
+      getInfo: 'zelda/getPlayInstanceInfoById',
+      modify: 'zelda/melody/modifyPlayRule'
     },
     list: 'marketing/invoke/?method=MarketingCenterService.getActivities'
   },

@@ -31,6 +31,24 @@ export default class Food {
     return instance.post(urls.food.listFoodCat, data, { headers: this.headers })
   }
 
+  listFoods(categoryId) {
+    let data = {
+      service: 'FoodService',
+      method: 'queryFoodsByCategoryIdWithFoodFilter',
+      params: {
+        foodFilter: 0,
+        shopType: 1,
+        shopId: this.shopId,
+        foodQueryPage: {
+          categoryId,
+          limit: 500,
+          offset: 0
+        }
+      }
+    }
+    return instance.post(urls.food.listFoods, data, { headers: this.headers })
+  }
+
   search(keyWord) {
     let data = {
       service: 'FoodService',
@@ -56,7 +74,7 @@ export default class Food {
 
   async find(name) {
     try {
-      let res = await this.search(name)
+      let res = await this.search(name.replace(/简食-|-10元|'0元购---/, ''))
       if (!res || !res.itemOfName) return Promise.reject({ err: 'food search failed' })
       const data = res.itemOfName.find(v => v.name == name)
       if (!data) return Promise.reject({ err: 'food not find' })
@@ -184,27 +202,40 @@ export default class Food {
         }
       }
     }
-    return instance.post(urls.food.listCategoryModels, data, { headers: this.headers })
+    return instance.post(urls.food.categoryModels, data, { headers: this.headers })
   }
 
-  async findCategoryModel(types) {
+  async findCategoryModel(cateName) {
     try {
       const { categoryList } = await this.listCategoryModels()
       if (!categoryList) return Promise.reject({ err: 'catemodels failed' })
+
+      const root = { name: 'root', children: categoryList }
+
+      const path = find(root, cateName, [])
+      if (!path) return Promise.reject({ err: 'cate not found' })
+      const categoryModel = path.reduceRight((s, v) => ({ ...v, children: [s] }))
+
+      return Promise.resolve(categoryModel)
     } catch (err) {
       return Promise.reject(err)
     }
 
-    function find(node, val, track) {
-      if (node.leaf) {
-        if (node.name == val) {
+    function find(node, name, path) {
+      if (node.children.length == 0) {
+        if (node.name == name) {
+          return path
+        } else {
+          path.splice(0, path.length)
+          return null
+        }
+      } else {
+        for (let child of node.children) {
+          let n = find(child, name, [...path, child])
+          if (n) return n
         }
       }
-
-      for (let child of node.children) {
-        if (find(child, val, track)) {
-        }
-      }
+      return null
     }
   }
 
@@ -255,5 +286,30 @@ export default class Food {
       }
       return null
     }
+  }
+
+  appeal(auditItem) {
+    let data = {
+      service: 'IllegalItemService',
+      method: 'appealForControl',
+      params: {
+        shopId: this.shopId,
+        auditItem
+      }
+    }
+    return instance.post(urls.food.appeal, data, { headers: this.headers })
+  }
+
+  batchRemove(foodsWithSpecId) {
+    let data = {
+      service: 'FoodService',
+      method: 'batchRemoveFoods',
+      params: {
+        filter: 0,
+        foodsWithSpecId,
+        shopId: this.shopId
+      }
+    }
+    return instance.post(urls.food.batchRemove, data, { headers: this.headers })
   }
 }
