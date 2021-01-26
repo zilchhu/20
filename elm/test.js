@@ -4,6 +4,7 @@ import flatten from 'flatten'
 import dayjs from 'dayjs'
 import fs from 'fs'
 import sleep from 'sleep-promise'
+import schedule from 'node-schedule'
 
 const knx = knex({
   client: 'mysql',
@@ -180,7 +181,7 @@ async function test_acttime() {
   }
 }
 
-async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice) {
+async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuType) {
   const app = new App(id)
   try {
     let result = {}
@@ -202,11 +203,16 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice) {
     }
 
     if (price) {
-      const priceRes = await app.food.updateFoodSpecs(
-        food.id,
-        food.specs.map(spec => ({ ...spec, packageFee: boxPrice, price }))
-      )
-      result.priceRes = priceRes.specs
+      if (skuType || food.recentSales <= 50) {
+        const priceRes = await updateSku(id, name, null, price)
+        result.priceRes = priceRes.specs
+      } else {
+        const priceRes = await app.food.updateFoodSpecs(
+          food.id,
+          food.specs.map(spec => ({ ...spec, packageFee: boxPrice, price }))
+        )
+        result.priceRes = priceRes.specs
+      }
     }
 
     if (actPrice) {
@@ -231,9 +237,11 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let data = await readXls('elm/饿了么折扣.xlsx', '折扣12.8')
+    let [data, _] = await knx.raw(`select shop_id,name,price,package_fee,min_purchase_quantity from ele_food_manage
+    where   insert_date>CURDATE() and min_purchase_quantity=2 and price<8 and 
+    ((package_fee+ price)*min_purchase_quantity>=15 or (package_fee+ price)*min_purchase_quantity<14 )`)
     // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [v.门店id, v.品名, null, null, null, 12.8])
+    data = data.map(v => [v.shop_id, v.name, null, 0.5, 6.9, null, false])
     // data = data.map(v => [v.门店id, v.品名])
 
     // let data = readJson('elm/log/log.json')
@@ -681,16 +689,43 @@ async function test_appeal() {
   }
 }
 
-// async function test() {
-//   try {
-//     await wrap(updateSku, [500620917, '西米红豆沙.', 1.1, 20])
-//   } catch (error) {
-//     console.error(error)
-//   }
-// }
+async function test_autotask() {
+  try {
+    let tasks = {
+      原价扣点折扣价: async function () {
+        try {
+          let task = await knx('test_task_').select().where({ title: '原价扣点折扣价', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, null, null, parseFloat(v.原价) - 1])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      两份起购餐盒费: async function () {
+        try {
+          let task = await knx('test_task_').select().where({ title: '两份起购餐盒费', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 1.5, null, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+    // await tasks['原价扣点折扣价']()
+    await tasks['两份起购餐盒费']()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// test_autotask()
 
 // test()
-// test_plan()
+test_plan()
 // test_subsidy()
 // test_loglow()
 // test_improve_low()

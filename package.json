@@ -9,6 +9,7 @@
     "graphql-import-files": "^1.0.8",
     "knex": "^0.21.14",
     "mysql": "^2.18.1",
+    "node-schedule": "^1.3.2",
     "omit.js": "^2.0.2",
     "sleep-promise": "^9.0.0",
     "xls-to-json": "^2.1.0",
