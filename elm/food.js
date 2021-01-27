@@ -300,6 +300,18 @@ export default class Food {
     return instance.post(urls.food.appeal, data, { headers: this.headers })
   }
 
+  neverAppeal(auditItem) {
+    let data = {
+      service: 'IllegalItemService',
+      method: "neverShowAuditTips",
+      params: {
+        shopId: this.shopId,
+        auditItem
+      }
+    }
+    return instance.post(urls.food.neverAppeal, data, { headers: this.headers })
+  }
+
   batchRemove(foodsWithSpecId) {
     let data = {
       service: 'FoodService',

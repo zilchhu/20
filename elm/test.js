@@ -85,7 +85,7 @@ async function updateAct(id, name, benefit) {
     let act = acts.find(v => v.name == name)
 
     if (act) {
-      const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
+      // const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
 
       // const actMaxCount = await app.act.foodAct.getCount()
       // if (
@@ -98,7 +98,7 @@ async function updateAct(id, name, benefit) {
       await app.act.foodAct.invalid(act.activityId, act.foodId)
       await app.act.foodAct.updateCount(-1)
 
-      const res = await app.act.foodAct.create(act.foodId, benefit, actContent.effectTimes)
+      const res = await app.act.foodAct.create(act.foodId, benefit, 10000)
       return Promise.resolve(res)
     } else {
       let effectTimes = 10000
@@ -203,7 +203,7 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
     }
 
     if (price) {
-      if (skuType || food.recentSales <= 50) {
+      if (skuType) {
         const priceRes = await updateSku(id, name, null, price)
         result.priceRes = priceRes.specs
       } else {
@@ -237,11 +237,11 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let [data, _] = await knx.raw(`select shop_id,name,price,package_fee,min_purchase_quantity from ele_food_manage
-    where   insert_date>CURDATE() and min_purchase_quantity=2 and price<8 and 
-    ((package_fee+ price)*min_purchase_quantity>=15 or (package_fee+ price)*min_purchase_quantity<14 )`)
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
+    AND shop_id IN (500986754,2044353152,501382845,500976570,2065657330,500957666,500966552,500851505,501130158,500905332,500730227,501127928,2062339655,2059004246,2059398188,2059445466,501090403,501108102,2044406460,501310861,2059445480,501128248,500163930,500178791,500925398,2062314640,501090671,500124770,500977905,500701134,2044333559,500942178,500852297,2042970162,500620917,501652928,2065465372,500682526,501106699)
+    AND name LIKE '%鸡爪%'`)
     // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [v.shop_id, v.name, null, 0.5, 6.9, null, false])
+    data = data.map(v => [v.shop_id, v.name, 1, null, null, null, false])
     // data = data.map(v => [v.门店id, v.品名])
 
     // let data = readJson('elm/log/log.json')
@@ -410,7 +410,7 @@ async function updateSubsidy(shopId) {
     rules[6].value = JSON.parse(rules[6].value)
     rules[6].value.rule[0].benefit = 6
     rules[6].value.rule[1].benefit = 10
-    rules[6].value.rule[2].benefit = 14
+    // rules[6].value.rule[2].benefit = 14
     rules[6].value = JSON.stringify(rules[6].value)
     let formFields = [rules[0], rules[6]]
 
@@ -422,8 +422,8 @@ async function updateSubsidy(shopId) {
 
 async function test_subsidy() {
   try {
-    let data = await readXls('elm/百亿补贴修改门店.xlsx', 'Sheet1')
-    data = data.map(v => [v.id])
+    let data = await readXls('elm/plan/1.饿了么满减活动检查.xlsx', '1.饿了么满减活动检查')
+    data = data.map(v => [v.shop_id])
     await loop(updateSubsidy, data, false)
   } catch (error) {
     console.error(error)
@@ -618,10 +618,14 @@ async function test_improve_low() {
     //   .map(v => ({ ...v, label: data.find(k => k.itemName == v.itemName).特色 }))
     //   .map(v => [v.shopId, v.itemName, v.label])
 
-    let data = await readJson('elm/log/log.json')
-    data = data.map(v => v.meta)
+    // let data = await readJson('elm/log/log.json')
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
+    AND shop_id IN (500986754,2044353152,501382845,500976570,2065657330,500957666,500966552,500851505,501130158,500905332,500730227,501127928,2062339655,2059004246,2059398188,2059445466,501090403,501108102,2044406460,501310861,2059445480,501128248,500163930,500178791,500925398,2062314640,501090671,500124770,500977905,500701134,2044333559,500942178,500852297,2042970162,500620917,501652928,2065465372,500682526,501106699)
+    AND name LIKE '%鸡爪%'`)
 
-    await loop(updateLabel, data, false)
+    data = data.map(v => [v.shop_id, '网红柠檬鸡爪【8小个】$', '有点辣。需要注意下哈~'])
+
+    await loop(updateDesc, data, false)
   } catch (error) {
     console.error(error)
   }
@@ -679,11 +683,24 @@ async function appeal(id, name) {
   }
 }
 
+async function neverAppeal(id, name) {
+  try {
+    const app = new App(id)
+    const food = await app.food.find(name)
+    // APPEAL_FAILED AUDIT_FAILED
+    if (!food.itemAuditInfoList || /APPEAL_FAILED|AUDIT_FAILED/.test(food.itemAuditInfoList[0].auditStatus))
+      return Promise.reject({ err: 'no need' })
+    return app.food.neverAppeal(food.itemAuditInfoList[0])
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
 async function test_appeal() {
   try {
-    let data = await readXls('elm/饿了么改价失败 申述.xlsx', 'Sheet1')
-    data = data.map(v => [v.门店id, v.产品]).slice(data.length - 220)
-    await loop(appeal, data, false)
+    let data = await readXls('elm/plan/工作簿3.xlsx', 'Sheet1')
+    data = data.map(v => [v.id, v.产品名])
+    await loop(neverAppeal, data, false)
   } catch (error) {
     console.error(error)
   }
@@ -715,7 +732,7 @@ async function test_autotask() {
         }
       }
     }
-    // await tasks['原价扣点折扣价']()
+    await tasks['原价扣点折扣价']()
     await tasks['两份起购餐盒费']()
   } catch (error) {
     console.error(error)
@@ -724,6 +741,8 @@ async function test_autotask() {
 
 // test_autotask()
 
+// test_appeal()
+// test_improve_low()
 // test()
 test_plan()
 // test_subsidy()

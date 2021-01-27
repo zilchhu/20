@@ -15,7 +15,9 @@ const urls = {
     forOptimize: 'nevermore.goods/invoke/?method=AssistantService.queryWaitForOptimizeItem',
     categoryModels: 'nevermore.goods/invoke/?method=CategoryService.getCategoryList',
     getMaterialTree: 'nevermore.goods/invoke/?method=MenuDataService.getMaterialTreeByShopId',
-    appeal: 'nevermore.goods/invoke/?method=IllegalItemService.appealForControl'
+    appeal: 'nevermore.goods/invoke/?method=IllegalItemService.appealForControl',
+    neverAppeal: 'nevermore.goods/invoke/?method=IllegalItemService.neverShowAuditTips',
+    updateCat: 'nevermore.goods/invoke/?method=FoodService.updateFirstGroup'
   },
   act: {
     foodAct: {
