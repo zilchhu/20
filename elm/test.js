@@ -711,6 +711,7 @@ async function test_autotask() {
     let tasks = {
       原价扣点折扣价: async function () {
         try {
+          console.log('原价扣点折扣价')
           let task = await knx('test_task_').select().where({ title: '原价扣点折扣价', platform: '饿了么' })
           if (!task) return
           let [data, _] = await knx.raw(task[0].sql)
@@ -722,6 +723,7 @@ async function test_autotask() {
       },
       两份起购餐盒费: async function () {
         try {
+          console.log('两份起购餐盒费')
           let task = await knx('test_task_').select().where({ title: '两份起购餐盒费', platform: '饿了么' })
           if (!task) return
           let [data, _] = await knx.raw(task[0].sql)
@@ -730,21 +732,86 @@ async function test_autotask() {
         } catch (e) {
           console.error(e)
         }
-      }
+      },
+      两份起购无餐盒费: async function() {
+        try {
+          console.log('两份起购无餐盒费')
+          let task = await knx('test_task_').select().where({ title: '两份起购无餐盒费', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 0.5, null, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      非: async function() {
+        try {
+          console.log('非')
+          let task = await knx('test_task_').select().where({ title: '≠6.9+0.5', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.shop_id, v.name, null, 0.5, 6.9, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      原价餐盒凑起送: async function() {
+        try {
+          console.log('原价餐盒凑起送')
+          let task = await knx('test_task_').select().where({ title: '原价餐盒凑起送', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 1, 13.8, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      甜品粉面套餐: async function() {
+        try {
+          console.log('甜品粉面套餐')
+          let task = await knx('test_task_').select().where({ title: '甜品粉面套餐', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 2, 25.8, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      贡茶粉面套餐: async function() {
+        try {
+          console.log('贡茶粉面套餐')
+          let task = await knx('test_task_').select().where({ title: '贡茶粉面套餐', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 2, 29.8, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
     }
     await tasks['原价扣点折扣价']()
     await tasks['两份起购餐盒费']()
+    await tasks['两份起购无餐盒费']()
+    await tasks['非']()
+    await tasks['原价餐盒凑起送']()
+    await tasks['甜品粉面套餐']()
+    await tasks['贡茶粉面套餐']()
   } catch (error) {
     console.error(error)
   }
 }
 
-// test_autotask()
+test_autotask()
 
 // test_appeal()
 // test_improve_low()
 // test()
-test_plan()
+// test_plan()
 // test_subsidy()
 // test_loglow()
 // test_improve_low()
