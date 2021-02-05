@@ -47,8 +47,9 @@ async function renameFood(id, oldName, newName) {
 
 async function test_rename() {
   try {
-    let data = await readXls('elm/饿了么产品名调整.xlsx', '饿了么产品名')
-    data = data.filter(v => v.修改后产品名 != '').map(v => [v.shop_id, v.name, v.修改后产品名])
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage  WHERE DATE(insert_date) = CURDATE() 
+      AND  (name LIKE '%草莓脏脏茶%' OR name LIKE '%芒果脏脏茶%') AND name NOT LIKE '%+%' ORDER BY shop_id`)
+    data = data.filter(v => v.修改后产品名 != '').map(v => [v.shop_id, v.name, v.name.replace('外卖不挂杯属于正常现象', '只可冷饮')])
     await loop(renameFood, data, false)
   } catch (error) {
     console.error(error)
@@ -85,7 +86,7 @@ async function updateAct(id, name, benefit) {
     let act = acts.find(v => v.name == name)
 
     if (act) {
-      // const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
+      const actContent = await app.act.foodAct.content(act.activityId, act.foodId)
 
       // const actMaxCount = await app.act.foodAct.getCount()
       // if (
@@ -98,7 +99,7 @@ async function updateAct(id, name, benefit) {
       await app.act.foodAct.invalid(act.activityId, act.foodId)
       await app.act.foodAct.updateCount(-1)
 
-      const res = await app.act.foodAct.create(act.foodId, benefit, 10000)
+      const res = await app.act.foodAct.create(act.foodId, benefit, actContent.effectTimes)
       return Promise.resolve(res)
     } else {
       let effectTimes = 10000
@@ -203,7 +204,7 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
     }
 
     if (price) {
-      if (skuType) {
+      if ((skuType || food.recentSales <= 30) && price > food.specs[0].price * 1.4) {
         const priceRes = await updateSku(id, name, null, price)
         result.priceRes = priceRes.specs
       } else {
@@ -237,11 +238,9 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
-    AND shop_id IN (500986754,2044353152,501382845,500976570,2065657330,500957666,500966552,500851505,501130158,500905332,500730227,501127928,2062339655,2059004246,2059398188,2059445466,501090403,501108102,2044406460,501310861,2059445480,501128248,500163930,500178791,500925398,2062314640,501090671,500124770,500977905,500701134,2044333559,500942178,500852297,2042970162,500620917,501652928,2065465372,500682526,501106699)
-    AND name LIKE '%鸡爪%'`)
+    let data = await readXls('elm/plan/饿了么修改.xls', '修改原价13.8')
     // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [v.shop_id, v.name, 1, null, null, null, false])
+    data = data.map(v => [v.门店id, v.品名, null, null, 13.8, null, false])
     // data = data.map(v => [v.门店id, v.品名])
 
     // let data = readJson('elm/log/log.json')
@@ -282,8 +281,10 @@ async function batchRemove(id, name) {
 
 async function test_offsell() {
   try {
-    let data = await readXls('elm/饿了么批量修改.xlsx', '批量下架')
-    data = data.map(v => [v.门店id, v.品名, false])
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
+    AND (name LIKE '%0元吃%' OR name LIKE '%0元购%')`)
+
+    data = data.map(v => [v.shop_id, v.name, false])
     await loop(updateSell, data, false)
   } catch (error) {
     console.error(error)
@@ -602,6 +603,28 @@ async function updateCateModel(id, name, model) {
   }
 }
 
+async function updateJoinHot(id, name) {
+  const app = new App(id)
+  try {
+    const food = await app.food.find(name)
+    const foodView = await app.food.getFoodView(food.id)
+
+    const p = foodView.food.properties.map(v => ({
+      ...v,
+      details:
+        v.details.length == 1
+          ? v.details
+              .map(d => ({ ...d, name: d.name.trim() }))
+              .concat([{ ...v.details[0], name: v.details[0].name + '.' }])
+          : v.details.map(d => ({ ...d, name: d.name.trim() }))
+    }))
+    const data = { ...foodView.food, joinHotGoods: true, properties: p }
+    return app.food.editFood(food.id, data)
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
 async function test_improve_low() {
   try {
     // let data = await readXls('elm/饿了么低质量(1)(1).xlsx', 'c2')
@@ -619,13 +642,179 @@ async function test_improve_low() {
     //   .map(v => [v.shopId, v.itemName, v.label])
 
     // let data = await readJson('elm/log/log.json')
-    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
-    AND shop_id IN (500986754,2044353152,501382845,500976570,2065657330,500957666,500966552,500851505,501130158,500905332,500730227,501127928,2062339655,2059004246,2059398188,2059445466,501090403,501108102,2044406460,501310861,2059445480,501128248,500163930,500178791,500925398,2062314640,501090671,500124770,500977905,500701134,2044333559,500942178,500852297,2042970162,500620917,501652928,2065465372,500682526,501106699)
-    AND name LIKE '%鸡爪%'`)
 
-    data = data.map(v => [v.shop_id, '网红柠檬鸡爪【8小个】$', '有点辣。需要注意下哈~'])
+    let data = `501293027
+    500976597
+    2069431636
+    500978127
+    337665077
+    2066637616
+    500807110
+    500977657
+    2072124325
+    2073060793
+    501331920
+    501307859
+    2034961279
+    2069439328
+    2000369921
+    2000553854
+    501120413
+    500626322
+    2069421855
+    2059321589
+    2032806756
+    2001309447
+    500961678
+    2036859197
+    2000057696
+    2059371239
+    337387076
+    2043020189
+    2043612048
+    500807611
+    2036923650
+    501402505
+    501653898
+    500944311
+    2059311820
+    2044383148
+    2073266660
+    501117346
+    501655396
+    501101401
+    500710740
+    2062149223
+    501348209
+    2036922361
+    2044399437
+    501348216
+    501080384
+    500920696
+    500968820
+    501088111
+    500850028
+    500729113
+    501125407
+    500707083
+    2032450032
+    500146966
+    500795650
+    2062189579
+    501127997
+    2069409212
+    2042668330
+    2073271161
+    500162851
+    172784456
+    2043111617
+    168048393
+    501686519
+    337359625
+    2000490542
+    2057184191
+    500845819
+    2073264822
+    500969722
+    2044914885
+    501128428
+    500850414
+    2072106679
+    500732131
+    2044387559
+    500673257
+    501625510
+    2041788658
+    2055892428
+    500600465
+    2042487542
+    500823702
+    500605574
+    2043361951
+    2044188288
+    2042678427
+    337417083
+    500610750
+    2069361212
+    2044401323
+    501676694
+    337447273
+    501120677
+    2062014821
+    2043923028
+    2065996973
+    501629032
+    171032999
+    2066605754
+    2001214161
+    501403768
+    501103172
+    161591866
+    2044199033
+    500818047
+    2043662434
+    2041713180
+    2038550574
+    2038390986
+    2001338621
+    2043017855
+    500958310
+    500960871
+    500978275
+    500959331
+    2059374461
+    156821661
+    2001036419
+    500920339
+    500962839
+    2073255007
+    501129234
+    2062149432
+    2043574809
+    336835017
+    2073319496
+    500621367
+    2069415609
+    500795963
+    174342019
+    2056477563
+    2073252478
+    2036933766
+    500178466
+    2043160124
+    2036842642
+    2019402155
+    2041830473
+    2058440522
+    `
+      .split('\n')
+      .map(v => v.trim())
 
-    await loop(updateDesc, data, false)
+    let foods = `火腿烤冷面$
+    相思红豆奶茶【必抢】$
+    双拼奶茶【必抢】$
+    招牌水果茶(大杯)
+    草莓脏脏茶(外卖不挂杯属于正常现象)$
+    网红柠檬鸡爪【4小个】$
+    杨枝甘露【必抢】$
+    【新品必抢】血糯米奶茶$
+    椰汁糕(8块)$
+    焦糖布丁$
+    芝士焗番薯
+    芝士葡萄【大杯】$
+    多肉葡萄【大杯】$
+    招牌芋圆奶茶$
+    【正宗】螺蛳粉$
+    复古蛋糕奶茶$
+    酱拌刀削面【必抢】$
+    【暖冬新品】芋泥波波茶$`
+      .split('\n')
+      .map(v => v.trim())
+
+    for (let food of foods) {
+      let data2 = data.map(v => [v, food])
+      await loop(updateJoinHot, data2, false)
+    }
   } catch (error) {
     console.error(error)
   }
@@ -706,6 +895,32 @@ async function test_appeal() {
   }
 }
 
+async function test_invalid_update() {
+  try {
+    let data = await readXls('elm/plan/1-04饿了么单折扣商品起送查询(1).xlsx', '1-04饿了么单折扣商品起送查询')
+    data = data.map(v => [v.shop_id, v.name, v.修改后原价, v.修改后折扣价])
+    await loop(helper, data, true)
+  } catch (error) {
+    console.error(error)
+  }
+
+  async function helper(id, name, price, actPrice) {
+    try {
+      const app = new App(id)
+      const food = await app.food.findInCats(name)
+      const actId = food.activities[0] ? food.activities[0].activityId : null
+      if (actId) {
+        console.log(actId, food.name, food.specs[0].id)
+        console.log(await app.act.foodAct.invalid(actId, food.specs[0].id))
+      }
+      await sleep(3000)
+      return updatePlan(id, name, null, null, price, actPrice)
+    } catch (e) {
+      return Promise.reject(e)
+    }
+  }
+}
+
 async function test_autotask() {
   try {
     let tasks = {
@@ -733,7 +948,7 @@ async function test_autotask() {
           console.error(e)
         }
       },
-      两份起购无餐盒费: async function() {
+      两份起购无餐盒费: async function () {
         try {
           console.log('两份起购无餐盒费')
           let task = await knx('test_task_').select().where({ title: '两份起购无餐盒费', platform: '饿了么' })
@@ -745,7 +960,19 @@ async function test_autotask() {
           console.error(e)
         }
       },
-      非: async function() {
+      常规产品无餐盒费: async function () {
+        try {
+          console.log('常规产品无餐盒费')
+          let task = await knx('test_task_').select().where({ title: '常规产品无餐盒费', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 1, null, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      非: async function () {
         try {
           console.log('非')
           let task = await knx('test_task_').select().where({ title: '≠6.9+0.5', platform: '饿了么' })
@@ -757,7 +984,7 @@ async function test_autotask() {
           console.error(e)
         }
       },
-      原价餐盒凑起送: async function() {
+      原价餐盒凑起送: async function () {
         try {
           console.log('原价餐盒凑起送')
           let task = await knx('test_task_').select().where({ title: '原价餐盒凑起送', platform: '饿了么' })
@@ -769,49 +996,109 @@ async function test_autotask() {
           console.error(e)
         }
       },
-      甜品粉面套餐: async function() {
+      甜品粉面套餐: async function () {
         try {
           console.log('甜品粉面套餐')
           let task = await knx('test_task_').select().where({ title: '甜品粉面套餐', platform: '饿了么' })
           if (!task) return
           let [data, _] = await knx.raw(task[0].sql)
-          data = data.map(v => [v.门店id, v.品名, null, 2, 25.8, null])
+          data = data.map(v => [v.门店id, v.品名, null, 2, 27.8, 15.8])
           await loop(updatePlan, data, false)
         } catch (e) {
           console.error(e)
         }
       },
-      贡茶粉面套餐: async function() {
+      贡茶粉面套餐: async function () {
         try {
           console.log('贡茶粉面套餐')
           let task = await knx('test_task_').select().where({ title: '贡茶粉面套餐', platform: '饿了么' })
           if (!task) return
           let [data, _] = await knx.raw(task[0].sql)
-          data = data.map(v => [v.门店id, v.品名, null, 2, 29.8, null])
+          data = data.map(v => [v.门店id, v.品名, null, 2, 29.6, 15.8])
           await loop(updatePlan, data, false)
         } catch (e) {
           console.error(e)
         }
       },
+      除原价扣点加料价格: async function () {
+        try {
+          console.log('除原价扣点加料价格')
+          let task = await knx('test_task_').select().where({ title: '除原价扣点加料价格', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, null, 0, 6, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      },
+      两份起购起购数: async function () {
+        try {
+          console.log('两份起购起购数')
+          let task = await knx('test_task_').select().where({ title: '两份起购起购数', platform: '饿了么' })
+          if (!task) return
+          let [data, _] = await knx.raw(task[0].sql)
+          data = data.map(v => [v.门店id, v.品名, 2, null, null, null])
+          await loop(updatePlan, data, false)
+        } catch (e) {
+          console.error(e)
+        }
+      }
     }
     await tasks['原价扣点折扣价']()
     await tasks['两份起购餐盒费']()
     await tasks['两份起购无餐盒费']()
+    await tasks['常规产品无餐盒费']()
     await tasks['非']()
     await tasks['原价餐盒凑起送']()
     await tasks['甜品粉面套餐']()
     await tasks['贡茶粉面套餐']()
+    await tasks['除原价扣点加料价格']()
+    await tasks['两份起购起购数']()
   } catch (error) {
     console.error(error)
   }
 }
 
-test_autotask()
+async function updateAttrs(id, name, props) {
+  try {
+    const app = new App(id)
+    const food = await app.food.find(name)
+    return app.food.updateFoodAttrs([food.id], props)
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
 
+async function test_updateAttrs() {
+  try {
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage  WHERE DATE(insert_date) = CURDATE() 
+      AND  (name LIKE '%草莓脏脏茶%' OR name LIKE '%芒果脏脏茶%') AND name NOT LIKE '%+%' ORDER BY shop_id`)
+    const props = [
+      { name: '温度', details: ['正常冰', '多冰', '少冰', '去冰'] },
+      { name: '甜度', details: ['正常糖', '少糖', '半糖', '多糖'] }
+    ]
+    data = data.map(v => [v.shop_id, v.name, props])
+    await loop(updateAttrs, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// console.log('auto task ...')
+// let j = schedule.scheduleJob('0 2 * * *', async function (fireDate) {
+//   console.log('This job was supposed to run at ' + fireDate + ', but actually ran at ' + new Date())
+//   await test_autotask()
+// })
+
+// test_updateAttrs()
+test_autotask()
+// test_offsell()
 // test_appeal()
 // test_improve_low()
 // test()
 // test_plan()
+// test_invalid_update()
 // test_subsidy()
 // test_loglow()
 // test_improve_low()
@@ -827,7 +1114,7 @@ test_autotask()
 // 32 33 34 35
 // 36 37 38 39
 
-// test_plan()
+test_plan()
 // test_rename()
 // test_acttime()
 // test_offsell()

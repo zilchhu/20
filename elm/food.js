@@ -18,6 +18,14 @@ export default class Food {
     return instance.post(urls.food.updateFoodCatSeq, data, { headers: this.headers })
   }
 
+  updateFoodCat() {
+    let data = {
+      service: 'FoodService',
+      method: 'updateFirstGroup',
+      params: {}
+    }
+  }
+
   listFoodCat() {
     let data = {
       service: 'FoodService',
@@ -84,6 +92,24 @@ export default class Food {
     }
   }
 
+  async findInCats(name) {
+    try {
+      const cats = await this.listFoodCat()
+      for (let cat of cats) {
+        try {
+          const foods = await this.listFoods(cat.id)
+          const food = foods.find(v => v.name == name)
+          if (food) return Promise.resolve(food)
+        } catch (e) {
+          return Promise.reject(e)
+        }
+      }
+      return Promise.reject('food not found')
+    } catch (e) {
+      return Promise.reject(e)
+    }
+  }
+
   updateName(itemId, name) {
     let data = {
       service: 'FoodService',
@@ -129,6 +155,22 @@ export default class Food {
       }
     }
     return instance.post(urls.food.updateAttr, data, { headers: this.headers })
+  }
+
+  updateFoodAttrs(itemIds, properties) {
+    let data = {
+      service: 'BatchFoodService',
+      method: 'batchUpdateFood',
+      params: {
+        shopId: this.shopId,
+        batchFood: {
+          updateFoodType: 'ITEM_PROPERTIES',
+          itemIds,
+          properties
+        }
+      }
+    }
+    return instance.post(urls.food.batchUpdate, data, { headers: this.headers })
   }
 
   updatePackageFee(foodId, foodSpecIds, packageFee) {
@@ -303,7 +345,7 @@ export default class Food {
   neverAppeal(auditItem) {
     let data = {
       service: 'IllegalItemService',
-      method: "neverShowAuditTips",
+      method: 'neverShowAuditTips',
       params: {
         shopId: this.shopId,
         auditItem
