@@ -3,11 +3,11 @@ import urls_ from './url.js'
 
 const namespace = 'axios-retry'
 
-const id = '7044BD8CBFA44539B91289386EB05347|1611798043136'
+const id = '63E97155736E4E70B1C744053F1C66E3|1613881907344'
 const metas = {
   appName: 'melody',
   appVersion: '4.4.0',
-  ksid: 'YTJLNZMTA1MjUzOTA0OTU1MTAxTlVCMkl6dDhQ'
+  ksid: 'OTA3YJMTA1MjUzOTA0OTU1MTAxTlhJSldrazJQ'
 }
 const ksid = metas.ksid
 const ncp = '2.0.0'

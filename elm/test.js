@@ -47,9 +47,9 @@ async function renameFood(id, oldName, newName) {
 
 async function test_rename() {
   try {
-    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage  WHERE DATE(insert_date) = CURDATE() 
-      AND  (name LIKE '%草莓脏脏茶%' OR name LIKE '%芒果脏脏茶%') AND name NOT LIKE '%+%' ORDER BY shop_id`)
-    data = data.filter(v => v.修改后产品名 != '').map(v => [v.shop_id, v.name, v.name.replace('外卖不挂杯属于正常现象', '只可冷饮')])
+    let data = await readXls('elm/plan/饿了么汤圆(2)(1).xls', 'Sheet1')
+
+    data = data.map(v => [v.编号, v.商品, v.商品.trim()+'（元宵节快乐）'])
     await loop(renameFood, data, false)
   } catch (error) {
     console.error(error)
@@ -189,12 +189,12 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
     // if (!minPurchase && !boxPrice && !price && !actPrice) return Promise.resolve(result)
     // if (!price && !boxPrice) return Promise.resolve(result)
     const food = await app.food.find(name)
-    if (minPurchase) {
+    if (minPurchase && minPurchase != '') {
       const purchaseRes = await app.food.updateMinPurchase([food.id], minPurchase)
       result.purchaseRes = purchaseRes
     }
 
-    if (boxPrice) {
+    if (boxPrice && boxPrice != '') {
       const boxRes = await app.food.updatePackageFee(
         food.id,
         food.specs.map(spec => spec.id),
@@ -203,9 +203,10 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
       result.boxRes = boxRes
     }
 
-    if (price) {
-      if ((skuType || food.recentSales <= 30) && price > food.specs[0].price * 1.4) {
-        const priceRes = await updateSku(id, name, null, price)
+    if (price && price != '') {
+      // (skuType || food.recentSales <= 30) && price > food.specs[0].price * 1.4
+      if (true) {
+        const priceRes = await updateSkuPrice(id, name, null, price)
         result.priceRes = priceRes.specs
       } else {
         const priceRes = await app.food.updateFoodSpecs(
@@ -216,7 +217,7 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
       }
     }
 
-    if (actPrice) {
+    if (actPrice && actPrice != '') {
       const actRes = await updateAct(id, name, actPrice)
       result.actRes = actRes
     }
@@ -238,9 +239,9 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let data = await readXls('elm/plan/饿了么修改.xls', '修改原价13.8')
+    let data = await readJson('elm/log/log.json')
     // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [v.门店id, v.品名, null, null, 13.8, null, false])
+    data = data.map(v => [...v.meta, true])
     // data = data.map(v => [v.门店id, v.品名])
 
     // let data = readJson('elm/log/log.json')
@@ -281,8 +282,9 @@ async function batchRemove(id, name) {
 
 async function test_offsell() {
   try {
-    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() 
-    AND (name LIKE '%0元吃%' OR name LIKE '%0元购%')`)
+    let [data, _] = await knx.raw(
+      `SELECT * FROM ele_food_manage  WHERE DATE(insert_date) = CURDATE()  AND name LIKE '%立减%配送费%'`
+    )
 
     data = data.map(v => [v.shop_id, v.name, false])
     await loop(updateSell, data, false)
@@ -528,7 +530,7 @@ async function updateMaterial(id, name, material) {
   }
 }
 
-async function updateSku(id, name, boxPrice, price) {
+async function updateSkuPrice(id, name, boxPrice, price) {
   const app = new App(id)
   try {
     const food = await app.food.find(name)
@@ -555,6 +557,32 @@ async function updateSku(id, name, boxPrice, price) {
     return app.food.editFood(food.id, { ...editedfoodView.food, specs: [spec] })
   } catch (e) {
     return Promise.reject(e)
+  }
+}
+
+async function updateSkuAttr(id, name, specAttribute) {
+  const app = new App(id)
+  try {
+    const food = await app.food.find(name)
+    const foodView = await app.food.getFoodView(food.id)
+    let specs = foodView.food.specs.map(v => ({ ...v, specAttribute }))
+
+    return app.food.editFood(food.id, { ...foodView.food, specs })
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+async function test_updateSkuAttrs() {
+  try {
+    let [data, _] = await knx.raw(
+      `SELECT * FROM ele_food_manage  WHERE DATE(insert_date) = CURDATE()  AND name LIKE '%杨枝甘露%'`
+    )
+    const attr = { weight: '500', unit: '毫升' }
+    data = data.map(v => [v.shop_id, v.name, attr])
+    await loop(updateSkuAttr, data, true)
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -1085,6 +1113,7 @@ async function test_updateAttrs() {
   }
 }
 
+// test_updateSkuAttrs()
 // console.log('auto task ...')
 // let j = schedule.scheduleJob('0 2 * * *', async function (fireDate) {
 //   console.log('This job was supposed to run at ' + fireDate + ', but actually ran at ' + new Date())
@@ -1092,7 +1121,7 @@ async function test_updateAttrs() {
 // })
 
 // test_updateAttrs()
-test_autotask()
+// test_autotask()
 // test_offsell()
 // test_appeal()
 // test_improve_low()
@@ -1114,7 +1143,6 @@ test_autotask()
 // 32 33 34 35
 // 36 37 38 39
 
-test_plan()
-// test_rename()
+test_rename()
 // test_acttime()
 // test_offsell()
