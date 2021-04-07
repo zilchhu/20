@@ -28,6 +28,26 @@ export default class Act {
     return instance.post(urls.act.list, data, { headers: this.headers })
   }
 
+  listFlowAct(operatorId) {
+    let params = {
+      operatorId
+    }
+    return instance2.get(urls.act.foodAct.listFlowAct, { params })
+  }
+
+  async findFlowAct(title) {
+    try {
+      let listRes = await this.listFlowAct(this.shopId)
+      if (!listRes) return Promise.reject({ err: 'act list failed' })
+      const { entityList } = listRes
+      const acttivity = entityList.find(v => v.subCampaign.playTypeSealDesc == title)
+      if (!acttivity) return Promise.reject({ err: 'act not found' })
+      return Promise.resolve(acttivity)
+    } catch (e) {
+      return Promise.reject(e)
+    }
+  }
+
   async find(title) {
     try {
       const listRes = await this.list()

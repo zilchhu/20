@@ -45,12 +45,39 @@ async function renameFood(id, oldName, newName) {
   }
 }
 
+async function updateImg(id, itemId, url) {
+  const app = new App(id)
+
+  try {
+    return app.food.updateImg(itemId, url)
+  } catch (err) {
+    return Promise.reject(err)
+  }
+}
+
 async function test_rename() {
   try {
-    let data = await readXls('elm/plan/饿了么汤圆(2)(1).xls', 'Sheet1')
+    let data = await readXls('elm/plan/3-1批量修改.xls', '饿了么产品名修改')
 
-    data = data.map(v => [v.编号, v.商品, v.商品.trim()+'（元宵节快乐）'])
+    data = data.map(v => [v.shop_id, v.name, v.修改后的产品名])
     await loop(renameFood, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function test_updateImg() {
+  try {
+    let [data, _] = await knx.raw(
+      `SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() AND name LIKE '%麻薯奶茶%'`
+    )
+
+    data = data.map(v => [
+      v.shop_id,
+      v.global_id,
+      'https://cube.elemecdn.com/8/05/ad95617968923b97ec84d289b707djpeg.jpeg'
+    ])
+    await loop(updateImg, data, false)
   } catch (error) {
     console.error(error)
   }
@@ -205,7 +232,7 @@ async function updatePlan(id, name, minPurchase, boxPrice, price, actPrice, skuT
 
     if (price && price != '') {
       // (skuType || food.recentSales <= 30) && price > food.specs[0].price * 1.4
-      if (true) {
+      if (false) {
         const priceRes = await updateSkuPrice(id, name, null, price)
         result.priceRes = priceRes.specs
       } else {
@@ -239,10 +266,10 @@ async function test_updateCount(id) {
 
 async function test_plan() {
   try {
-    let data = await readJson('elm/log/log.json')
-    // data = data.map(v=>[v.id, v.分类, 2, 0.5, 6.9, 2.99])
-    data = data.map(v => [...v.meta, true])
-    // data = data.map(v => [v.门店id, v.品名])
+    // let data = await readXls('elm/plan/折扣商品原较低(1).xlsx', '饿了么涨原价')
+    // data = data.map(v => [v.shop_id, v.name, null, null, v.原价修改为])
+
+    let data = [['2041788658', '吮指脆皮鸡腿.$', null, null, '13.8']]
 
     // let data = readJson('elm/log/log.json')
     //   .filter(v => v.err.code == 'ETIMEDOUT')
@@ -277,6 +304,18 @@ async function batchRemove(id, name) {
     return app.food.batchRemove([{ foodId: food.id, foodSpecIds: food.specs.map(spec => spec.id) }])
   } catch (e) {
     return Promise.reject(e)
+  }
+}
+
+async function test_remove() {
+  try {
+    let [data, _] = await knx.raw(`SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() AND (
+      name LIKE '%0元吃%'
+      OR name LIKE '%0元购%')`)
+    data = data.map(v => [v.shop_id, v.name])
+    await loop(batchRemove, data)
+  } catch (e) {
+    console.error(e)
   }
 }
 
@@ -401,18 +440,23 @@ async function updateDeliverActTime(id) {
   }
 }
 
-async function updateSubsidy(shopId) {
+async function updateSubsidy(shopId, _1, _2, _3) {
   const app = new App(shopId)
   try {
-    const act = await app.act.find('百亿补贴')
+    // const act = await app.act.find('百亿补贴')
 
-    const instanceId = new URL(act.url).searchParams.get('playInstanceId')
-    const { globalId } = await app.act.subsidyAct.getGlobalId(instanceId)
+    const act = await app.act.findFlowAct('百亿补贴')
+    const instanceId = act.applyShopDtoResult.entityList[0].playInstanceId
+    const globalId = act.applyShopDtoResult.entityList[0].applyInfoId
+
+    // const instanceId = new URL(act.url).searchParams.get('playInstanceId')
+    // const { globalId } = await app.act.subsidyAct.getGlobalId(instanceId)
 
     let { rules } = await app.act.subsidyAct.getInfo(instanceId)
     rules[6].value = JSON.parse(rules[6].value)
-    rules[6].value.rule[0].benefit = 6
-    rules[6].value.rule[1].benefit = 10
+    rules[6].value.rule[0].benefit = parseInt(_1)
+    rules[6].value.rule[1].benefit = parseInt(_2)
+    rules[6].value.rule[2].benefit = parseInt(_3)
     // rules[6].value.rule[2].benefit = 14
     rules[6].value = JSON.stringify(rules[6].value)
     let formFields = [rules[0], rules[6]]
@@ -425,9 +469,9 @@ async function updateSubsidy(shopId) {
 
 async function test_subsidy() {
   try {
-    let data = await readXls('elm/plan/1.饿了么满减活动检查.xlsx', '1.饿了么满减活动检查')
-    data = data.map(v => [v.shop_id])
-    await loop(updateSubsidy, data, false)
+    let data = await readXls('elm/plan/百亿补贴修改(1).xlsx', '1.饿了么满减活动检查')
+    data = data.filter(v => v.第一档 != '').map(v => [v.shop_id, v.第一档, v.第二档, v.第三档])
+    await loop(updateSubsidy, data, true)
   } catch (error) {
     console.error(error)
   }
@@ -494,7 +538,7 @@ async function logLow(id) {
 
 async function test_loglow() {
   try {
-    let data = await knx('elm_shops_').select().where({ restaurantType: 'LEAF' })
+    let data = [{ id: 501823909 }]
     data = data.map(v => [v.id])
     await loop(logLow, data, false)
   } catch (error) {
@@ -529,6 +573,7 @@ async function updateMaterial(id, name, material) {
     return Promise.reject(e)
   }
 }
+
 
 async function updateSkuPrice(id, name, boxPrice, price) {
   const app = new App(id)
@@ -646,16 +691,29 @@ async function updateJoinHot(id, name) {
               .concat([{ ...v.details[0], name: v.details[0].name + '.' }])
           : v.details.map(d => ({ ...d, name: d.name.trim() }))
     }))
-    const data = { ...foodView.food, joinHotGoods: true, properties: p }
+    const data = { ...foodView.food, joinHotGoods: false, properties: p }
     return app.food.editFood(food.id, data)
   } catch (e) {
     return Promise.reject(e)
   }
 }
 
+async function test_updateJoinHot() {
+  try {
+    // let data = await new App(500621367).food.listFoods(1700738780)
+    let [data, _] = await knx.raw(
+      `SELECT * FROM ele_food_manage WHERE DATE(insert_date) = CURDATE() AND shop_id IN (500621367)`
+    )
+    data = data.map(v => [v.shop_id, v.name])
+    await loop(updateJoinHot, data, false)
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 async function test_improve_low() {
   try {
-    // let data = await readXls('elm/饿了么低质量(1)(1).xlsx', 'c2')
+    // let data = await readXls('elm/plan/饿了么低质量(1)(1).xlsx', 'c2')
     // data = data.filter(v => v.特色 != '')
     // let data2 = await knx('test_elm_low_')
     //   .select()
@@ -664,185 +722,25 @@ async function test_improve_low() {
     //     data.map(v => v.itemName)
     //   )
     //   .andWhere('lowIndicator', 'like', '%特色%')
+    //   .andWhere({ shopId: 501823909 })
     // data2 = data2
     //   // .slice(data2.length - 38000)
     //   .map(v => ({ ...v, label: data.find(k => k.itemName == v.itemName).特色 }))
     //   .map(v => [v.shopId, v.itemName, v.label])
 
-    // let data = await readJson('elm/log/log.json')
-
-    let data = `501293027
-    500976597
-    2069431636
-    500978127
-    337665077
-    2066637616
-    500807110
-    500977657
-    2072124325
-    2073060793
-    501331920
-    501307859
-    2034961279
-    2069439328
-    2000369921
-    2000553854
-    501120413
-    500626322
-    2069421855
-    2059321589
-    2032806756
-    2001309447
-    500961678
-    2036859197
-    2000057696
-    2059371239
-    337387076
-    2043020189
-    2043612048
-    500807611
-    2036923650
-    501402505
-    501653898
-    500944311
-    2059311820
-    2044383148
-    2073266660
-    501117346
-    501655396
-    501101401
-    500710740
-    2062149223
-    501348209
-    2036922361
-    2044399437
-    501348216
-    501080384
-    500920696
-    500968820
-    501088111
-    500850028
-    500729113
-    501125407
-    500707083
-    2032450032
-    500146966
-    500795650
-    2062189579
-    501127997
-    2069409212
-    2042668330
-    2073271161
-    500162851
-    172784456
-    2043111617
-    168048393
-    501686519
-    337359625
-    2000490542
-    2057184191
-    500845819
-    2073264822
-    500969722
-    2044914885
-    501128428
-    500850414
-    2072106679
-    500732131
-    2044387559
-    500673257
-    501625510
-    2041788658
-    2055892428
-    500600465
-    2042487542
-    500823702
-    500605574
-    2043361951
-    2044188288
-    2042678427
-    337417083
-    500610750
-    2069361212
-    2044401323
-    501676694
-    337447273
-    501120677
-    2062014821
-    2043923028
-    2065996973
-    501629032
-    171032999
-    2066605754
-    2001214161
-    501403768
-    501103172
-    161591866
-    2044199033
-    500818047
-    2043662434
-    2041713180
-    2038550574
-    2038390986
-    2001338621
-    2043017855
-    500958310
-    500960871
-    500978275
-    500959331
-    2059374461
-    156821661
-    2001036419
-    500920339
-    500962839
-    2073255007
-    501129234
-    2062149432
-    2043574809
-    336835017
-    2073319496
-    500621367
-    2069415609
-    500795963
-    174342019
-    2056477563
-    2073252478
-    2036933766
-    500178466
-    2043160124
-    2036842642
-    2019402155
-    2041830473
-    2058440522
-    `
+    let ids = `501635698
+    501655367
+    501655374
+    501660359
+    2072030407
+    2076485570`
       .split('\n')
       .map(v => v.trim())
 
-    let foods = `火腿烤冷面$
-    相思红豆奶茶【必抢】$
-    双拼奶茶【必抢】$
-    招牌水果茶(大杯)
-    草莓脏脏茶(外卖不挂杯属于正常现象)$
-    网红柠檬鸡爪【4小个】$
-    杨枝甘露【必抢】$
-    【新品必抢】血糯米奶茶$
-    椰汁糕(8块)$
-    焦糖布丁$
-    芝士焗番薯
-    芝士葡萄【大杯】$
-    多肉葡萄【大杯】$
-    招牌芋圆奶茶$
-    【正宗】螺蛳粉$
-    复古蛋糕奶茶$
-    酱拌刀削面【必抢】$
-    【暖冬新品】芋泥波波茶$`
-      .split('\n')
-      .map(v => v.trim())
+    let data = await readXls('elm/plan/饿了么（大计划民治店）—商品描述.xlsx', '修改版')
+    data = data.map(v => [2072030407, v.商品名称.trim(), v.商品描述.trim()])
 
-    for (let food of foods) {
-      let data2 = data.map(v => [v, food])
-      await loop(updateJoinHot, data2, false)
-    }
+    await loop(updateDesc, data)
   } catch (error) {
     console.error(error)
   }
@@ -1113,6 +1011,37 @@ async function test_updateAttrs() {
   }
 }
 
+async function updateStock(id) {
+  try {
+    let app = new App(id)
+    let cats = await app.food.listFoodCat()
+    return Promise.all(cats.map(async cat => {
+      let foods = await app.food.listFoods(cat.id)
+      let stocks = foods.map(v => ({
+        maxStock: 10000,
+        stock: 10000,
+        stockStatus: 1,
+        foodId: v.id,
+        foodSpecIds: v.specs.map(k => k.id)
+      }))
+      console.log(cat.name)
+      return app.food.updateStock(stocks)
+    }))
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+async function test_updateStock() {
+  try {
+    let data = await await knx('ele_info_manage').where({ status: 0 })
+    data = data.map(v => [v.shop_id])
+    await loop(updateStock, data, false)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 // test_updateSkuAttrs()
 // console.log('auto task ...')
 // let j = schedule.scheduleJob('0 2 * * *', async function (fireDate) {
@@ -1124,25 +1053,20 @@ async function test_updateAttrs() {
 // test_autotask()
 // test_offsell()
 // test_appeal()
+// test_loglow()
 // test_improve_low()
 // test()
 // test_plan()
+// test_remove()
 // test_invalid_update()
 // test_subsidy()
 // test_loglow()
 // test_improve_low()
 // test_logAppeal()
-// 0  1  2  3
-// 4  5  6  7
-// 8  9  10 11
-// 12 13 14 15
-// 16 17 18 19
-// 20 21 22 23
-// 24 25 26 27
-// 28 29 30 31
-// 32 33 34 35
-// 36 37 38 39
 
-test_rename()
+// test_rename()
 // test_acttime()
 // test_offsell()
+// test_updateJoinHot()
+// test_updateImg()
+test_updateStock()

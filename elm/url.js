@@ -17,7 +17,8 @@ const urls = {
     getMaterialTree: 'nevermore.goods/invoke/?method=MenuDataService.getMaterialTreeByShopId',
     appeal: 'nevermore.goods/invoke/?method=IllegalItemService.appealForControl',
     neverAppeal: 'nevermore.goods/invoke/?method=IllegalItemService.neverShowAuditTips',
-    updateCat: 'nevermore.goods/invoke/?method=FoodService.updateFirstGroup'
+    updateCat: 'nevermore.goods/invoke/?method=FoodService.updateFirstGroup',
+    updateImg: 'nevermore.goods/invoke/?method=ItemPhotoService.updateItemPhotoHash'
   },
   act: {
     foodAct: {
@@ -27,7 +28,8 @@ const urls = {
       list: 'marketing/invoke/?method=MarketingCenterService.getFoods',
       updateCount: 'marketing/invoke/?method=ActivityShowService.updateShopShareMaxCount',
       getCount: 'marketing/invoke/?method=ActivityRegulationService.getMaxActivitySkuCountPerOrderRule',
-      update: 'marketing/invoke/?method=SkuActivityNcpService.updateSkuActivityItem'
+      update: 'marketing/invoke/?method=SkuActivityNcpService.updateSkuActivityItem',
+      listFlowAct: 'zelda/CampaignNaposService/pageQuerySubCampaignWithApply?currentPage=1&pageSize=10&applyStatusSet=%5B%22APPROVED%22%5D'
     },
     deliverAct: {
       getForm: 'play.everything/PlayInstanceService/getSelfPlayForm',

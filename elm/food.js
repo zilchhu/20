@@ -125,6 +125,21 @@ export default class Food {
     return instance.post(urls.food.updateAttr, data, { headers: this.headers })
   }
 
+  updateImg(itemId, photoUrl) {
+    let data = {
+      service: 'ItemPhotoService',
+      method: 'updateItemPhotoHash',
+      params: {
+        itemPhotoHashDto: {
+          itemId,
+          photoUrl,
+          shopId: this.shopId
+        }
+      }
+    }
+    return instance.post(urls.food.updateImg, data, { headers: this.headers })
+  }
+
   updateMinPurchase(itemIds, minPurchaseQuantity) {
     let data = {
       service: 'BatchFoodService',
@@ -365,5 +380,16 @@ export default class Food {
       }
     }
     return instance.post(urls.food.batchRemove, data, { headers: this.headers })
+  }
+
+  updateStock(foodStockUpdate) {
+    let data = {
+      service: 'FoodService',
+      method: 'updateFoodsStock',
+      params: {
+        foodStockUpdate
+      }
+    }
+    return instance.post(urls.food.updateStock, data, { headers: this.headers })
   }
 }

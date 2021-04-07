@@ -1,19 +1,36 @@
 import axios from 'axios'
 import urls_ from './url.js'
+import knex from 'knex'
+
+const knx = knex({
+  client: 'mysql',
+  connection: {
+    host: '192.168.3.112',
+    user: 'root',
+    password: '123456',
+    database: 'naicai'
+  }
+})
 
 const namespace = 'axios-retry'
 
-const id = '63E97155736E4E70B1C744053F1C66E3|1613881907344'
+let {ks_id} = await knx('ele_info_manage').first('ks_id')
+
+// const id = '63E97155736E4E70B1C744053F1C66E3|1613881907344'
+const id = 'ECC07A81FECF4AB2B36E70CEE050E921|1615185495921'
+// ks_id = 'ZTE4MJMTA1MjcyMDc0NjUxMDAxTllnL3ZYczVQ'
+
 const metas = {
   appName: 'melody',
   appVersion: '4.4.0',
-  ksid: 'OTA3YJMTA1MjUzOTA0OTU1MTAxTlhJSldrazJQ'
+  ksid: ks_id
 }
 const ksid = metas.ksid
 const ncp = '2.0.0'
 
 const instance = axios.create({
   baseURL: 'https://app-api.shop.ele.me/',
+  timeout: 3000,
   headers: {
     accept: 'application/json, text/plain, */*',
     'accept-encoding': 'gzip, deflate, br',
@@ -68,7 +85,7 @@ instance.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const shouldRetry = /ETIMEDOUT|ECONNRESET/.test(error.code) && config[namespace].retryCount < 3
+    const shouldRetry = /ETIMEDOUT|ECONNRESET|ECONNABORTED/.test(error.code) && config[namespace].retryCount < 3
 
     if (shouldRetry) {
       config[namespace].retryCount += 1
