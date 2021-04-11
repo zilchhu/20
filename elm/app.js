@@ -35,7 +35,7 @@ export async function loop(f, dataSource, slow) {
     for(let data of dataSource) {
       console.log(count)
       await wrap(f, data)
-      if(slow) await sleep(4000)
+      if(slow) await sleep(3000)
       count -= 1
     }
   } catch (err) {

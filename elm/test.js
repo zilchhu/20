@@ -33,11 +33,11 @@ function omit(obj, ks) {
   return newObj
 }
 
-async function renameFood(id, oldName, newName) {
+async function renameFood(id, oldName, catName, newName) {
   const app = new App(id)
 
   try {
-    const food = await app.food.find(oldName)
+    const food = await app.food.find2(oldName, catName)
     const res = await app.food.updateName(food.id, newName)
     return Promise.resolve(res.name)
   } catch (err) {
@@ -57,10 +57,11 @@ async function updateImg(id, itemId, url) {
 
 async function test_rename() {
   try {
-    let data = await readXls('elm/plan/3-1批量修改.xls', '饿了么产品名修改')
+    let data = await readXls('C:/Users/Administrator/Documents/work/20/elm/plan/饿了么贡茶产品信息.xlsx', '饿了么贡茶产品信息')
 
-    data = data.map(v => [v.shop_id, v.name, v.修改后的产品名])
-    await loop(renameFood, data, false)
+    let dat = data.map(v => [v.shop_id, v.name, v.category_name, v.修改后产品名])
+    await loop(renameFood, dat, false)
+
   } catch (error) {
     console.error(error)
   }
@@ -574,7 +575,6 @@ async function updateMaterial(id, name, material) {
   }
 }
 
-
 async function updateSkuPrice(id, name, boxPrice, price) {
   const app = new App(id)
   try {
@@ -1015,18 +1015,20 @@ async function updateStock(id) {
   try {
     let app = new App(id)
     let cats = await app.food.listFoodCat()
-    return Promise.all(cats.map(async cat => {
-      let foods = await app.food.listFoods(cat.id)
-      let stocks = foods.map(v => ({
-        maxStock: 10000,
-        stock: 10000,
-        stockStatus: 1,
-        foodId: v.id,
-        foodSpecIds: v.specs.map(k => k.id)
-      }))
-      console.log(cat.name)
-      return app.food.updateStock(stocks)
-    }))
+    return Promise.all(
+      cats.map(async cat => {
+        let foods = await app.food.listFoods(cat.id)
+        let stocks = foods.map(v => ({
+          maxStock: 10000,
+          stock: 10000,
+          stockStatus: 1,
+          foodId: v.id,
+          foodSpecIds: v.specs.map(k => k.id)
+        }))
+        console.log(cat.name)
+        return app.food.updateStock(stocks)
+      })
+    )
   } catch (e) {
     return Promise.reject(e)
   }
@@ -1064,9 +1066,9 @@ async function test_updateStock() {
 // test_improve_low()
 // test_logAppeal()
 
-// test_rename()
+test_rename()
 // test_acttime()
 // test_offsell()
 // test_updateJoinHot()
 // test_updateImg()
-test_updateStock()
+// test_updateStock()

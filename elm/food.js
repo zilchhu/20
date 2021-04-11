@@ -92,6 +92,33 @@ export default class Food {
     }
   }
 
+  async find2(name, catName) {
+    try {
+      let res = await this.search(name.replace(/简食-|-10元|'0元购---|右-上点亮关注下单,|收️❤️臧店铺/, ''))
+      if (!res || !res.itemOfName) return Promise.reject({ err: 'food search failed' })
+      const cats = await this.listFoodCat()
+      const cat = cats.find(v => v.name == catName)
+      if (!cat) return Promise.reject({ err: 'food search failed' })
+      const data = res.itemOfName.find(v => v.name == name && cat.id == v.categoryId)
+      if (!data) return Promise.reject({ err: 'food not find' })
+      return Promise.resolve(data)
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  }
+
+  async mfind(name) {
+    try {
+      let res = await this.search(name.replace(/简食-|-10元|'0元购---|右-上点亮关注下单,|收️❤️臧店铺/, ''))
+      if (!res || !res.itemOfName) return Promise.reject({ err: 'food search failed' })
+      const data = res.itemOfName.filter(v => v.name == name)
+      if (!data) return Promise.reject({ err: 'food not find' })
+      return Promise.resolve(data)
+    } catch (err) {
+      return Promise.reject(err)
+    }
+  }
+
   async findInCats(name) {
     try {
       const cats = await this.listFoodCat()
